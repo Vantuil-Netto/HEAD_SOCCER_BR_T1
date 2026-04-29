@@ -64,12 +64,12 @@ def load_dir_both(dirname):
 
 class Assets:
     heads = {
-        "Argentina": load_head("cabeza1.png"),
-        "Brasil": load_head("cabeza2.png"),
-        "Alemanha": load_head("cabeza3.png"),
-        "Espanha": load_head("cabeza4.png")
+        "Argentina": load_head("neymarjr_head.png"),
+        "Brasil": load_head("ronaldinho_head.png"),
+        "Alemanha": load_head("kaka_head.png"),
+        "Espanha": load_head("fenomeno_head.png")
     }
-    ball = load_image("botin.png") # Usando o botin como bola para estilo
+    ball = load_image("classic_ball.png") # Usando classic_ball como bola para estilo
     goal_img = load_image("goal.png")
     goal_img_r = pygame.transform.flip(goal_img, True, False)
     goal_anim = load_dir_both("goalA")
@@ -224,8 +224,8 @@ class Player:
 
 class Ball:
     def __init__(self):
-        self.radius = 20
-        self.img = pygame.transform.scale(Assets.ball, (40, 40))
+        self.radius = 30
+        self.img = pygame.transform.scale(Assets.ball, (60, 60))
         self.reset()
         self.low_gravity = False
         self.low_gravity_timer = 0
