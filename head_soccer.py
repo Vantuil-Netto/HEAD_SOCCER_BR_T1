@@ -8,8 +8,9 @@ import time
 
 # --- Configurações Iniciais ---
 pygame.init()
-SCREEN_WIDTH, SCREEN_HEIGHT = 900, 600
-pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+SCREEN_WIDTH = screen.get_width()
+SCREEN_HEIGHT = screen.get_height()
 pygame.display.set_caption("Head Soccer Classic - Futebol Raiz")
 FPS = 60
 
@@ -19,15 +20,15 @@ IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 # === FÍSICA ARCADE ===
-GRAVITY = 0.45
-BALL_GRAVITY = 0.28
-BOUNCE = 0.62
-BALL_FRICTION = 0.98
-FRICTION = 0.985
-MAX_BALL_SPEED = 12
-MAX_BALL_VERTICAL_SPEED = 16
-KICK_FORCE_MULTIPLIER = 1.3
-KICK_UPWARD_FORCE = 10
+GRAVITY = 0.5
+BALL_GRAVITY = 0.34
+BOUNCE = 0.58
+BALL_FRICTION = 0.97
+FRICTION = 0.98
+MAX_BALL_SPEED = 10
+MAX_BALL_VERTICAL_SPEED = 13
+KICK_FORCE_MULTIPLIER = 1.25
+KICK_UPWARD_FORCE = 7
 
 # Cores
 WHITE = (255, 255, 255)
@@ -66,14 +67,14 @@ def load_shoe_sprite():
     shoe_path = os.path.join(IMAGES_DIR, "chuteira.png")
     if os.path.exists(shoe_path):
         shoe = pygame.image.load(shoe_path).convert_alpha()
-        shoe = pygame.transform.scale(shoe, (65, 40))
+        shoe = pygame.transform.scale(shoe, (80, 50))
     else:
         # Fallback: criar sprite simples
-        shoe = pygame.Surface((65, 40), pygame.SRCALPHA)
-        pygame.draw.ellipse(shoe, (220, 60, 40), pygame.Rect(5, 5, 55, 25))
-        pygame.draw.rect(shoe, (220, 60, 40), pygame.Rect(5, 12, 55, 18))
-        pygame.draw.polygon(shoe, WHITE, [(58, 14), (65, 17), (60, 25)])
-        pygame.draw.line(shoe, BLACK, (5, 32), (60, 32), 3)
+        shoe = pygame.Surface((80, 50), pygame.SRCALPHA)
+        pygame.draw.ellipse(shoe, (220, 60, 40), pygame.Rect(5, 5, 70, 30))
+        pygame.draw.rect(shoe, (220, 60, 40), pygame.Rect(5, 12, 70, 22))
+        pygame.draw.polygon(shoe, WHITE, [(70, 15), (80, 20), (72, 30)])
+        pygame.draw.line(shoe, BLACK, (5, 40), (75, 40), 4)
     shoe_r = pygame.transform.flip(shoe, True, False)
     return shoe, shoe_r
 
@@ -155,20 +156,20 @@ class Player:
         
         if self.kicking:
             elapsed = now - self.kick_animation_timer
-            progress = min(1.0, elapsed / 250.0)
+            progress = min(1.0, elapsed / 200.0)
             
-            if progress < 0.5:
-                ratio = progress * 2
-                self.shoe_angle = ratio * 90
-                self.shoe_offset_x = ratio * 45 if self.side == 0 else -ratio * 45
-                self.shoe_offset_y = -ratio * 18
+            if progress < 0.4:
+                ratio = progress * 2.5
+                self.shoe_angle = ratio * 100
+                self.shoe_offset_x = ratio * 55 if self.side == 0 else -ratio * 55
+                self.shoe_offset_y = -ratio * 22
             else:
-                ratio = (progress - 0.5) * 2
-                self.shoe_angle = (1 - ratio) * 90
-                self.shoe_offset_x = (1 - ratio) * 45 if self.side == 0 else -(1 - ratio) * 45
-                self.shoe_offset_y = -(1 - ratio) * 18
+                ratio = (progress - 0.4) / 0.6
+                self.shoe_angle = (1 - ratio) * 100
+                self.shoe_offset_x = (1 - ratio) * 55 if self.side == 0 else -(1 - ratio) * 55
+                self.shoe_offset_y = -(1 - ratio) * 22
             
-            if elapsed >= 250:
+            if elapsed >= 200:
                 self.kicking = False
                 self.shoe_angle = 0
                 self.shoe_offset_x = 0
@@ -219,16 +220,16 @@ class Player:
         if self.shoe_angle != 0:
             shoe_img = pygame.transform.rotate(shoe_img, self.shoe_angle if self.side == 0 else -self.shoe_angle)
         
-        shoe_x = self.rect.centerx + self.shoe_offset_x + (48 if self.side == 0 else -48)
-        shoe_y = self.rect.centery + self.shoe_offset_y + 38
+        shoe_x = self.rect.centerx + self.shoe_offset_x + (55 if self.side == 0 else -55)
+        shoe_y = self.rect.centery + self.shoe_offset_y + 45
         shoe_rect = shoe_img.get_rect(center=(int(shoe_x), int(shoe_y)))
-        screen.blit(shoe_img, shoe_rect)
+        screen.blit(shoe_img, shoe_rect.topleft)
 
 class Ball:
     def __init__(self):
-        self.radius = 28
+        self.radius = 34
         self.reset()
-        self.img = pygame.transform.scale(Assets.ball, (56, 56))
+        self.img = pygame.transform.scale(Assets.ball, (68, 68))
 
     def reset(self):
         self.x = SCREEN_WIDTH // 2
@@ -237,28 +238,39 @@ class Ball:
         self.vel_y = 0
 
     def update(self):
-        self.vel_y += BALL_GRAVITY
-        self.vel_x *= BALL_FRICTION
-        
-        self.x += self.vel_x
-        self.y += self.vel_y
+        # Substeps para melhor estabilidade
+        for _ in range(2):
+            self.vel_y += BALL_GRAVITY * 0.5
+            self.vel_x *= BALL_FRICTION ** 0.5
+            
+            self.x += self.vel_x * 0.5
+            self.y += self.vel_y * 0.5
 
-        if self.y + self.radius >= SCREEN_HEIGHT - 40:
-            self.y = SCREEN_HEIGHT - 40 - self.radius
-            self.vel_y = -self.vel_y * BOUNCE
-            if abs(self.vel_y) < 1: self.vel_y = 0
+            # Limite inferior (chão) - NUNCA atravessar
+            if self.y + self.radius >= SCREEN_HEIGHT - 40:
+                self.y = SCREEN_HEIGHT - 40 - self.radius
+                if self.vel_y > 0:
+                    self.vel_y = -self.vel_y * BOUNCE
+                    if abs(self.vel_y) < 0.5: self.vel_y = 0
 
-        if self.x - self.radius <= 0:
-            self.x = self.radius
-            self.vel_x = -self.vel_x * BOUNCE
-        elif self.x + self.radius >= SCREEN_WIDTH:
-            self.x = SCREEN_WIDTH - self.radius
-            self.vel_x = -self.vel_x * BOUNCE
+            # Limites horizontais
+            if self.x - self.radius <= 0:
+                self.x = self.radius
+                self.vel_x = abs(self.vel_x) * BOUNCE * 0.6
+            elif self.x + self.radius >= SCREEN_WIDTH:
+                self.x = SCREEN_WIDTH - self.radius
+                self.vel_x = -abs(self.vel_x) * BOUNCE * 0.6
 
-        if abs(self.vel_x) > MAX_BALL_SPEED:
-            self.vel_x = (self.vel_x / abs(self.vel_x)) * MAX_BALL_SPEED
-        if abs(self.vel_y) > MAX_BALL_VERTICAL_SPEED:
-            self.vel_y = (self.vel_y / abs(self.vel_y)) * MAX_BALL_VERTICAL_SPEED
+            # Limite superior
+            if self.y - self.radius < 0:
+                self.y = self.radius
+                self.vel_y = 0
+
+            # Limitar velocidades
+            if abs(self.vel_x) > MAX_BALL_SPEED:
+                self.vel_x = (self.vel_x / abs(self.vel_x)) * MAX_BALL_SPEED
+            if abs(self.vel_y) > MAX_BALL_VERTICAL_SPEED:
+                self.vel_y = (self.vel_y / abs(self.vel_y)) * MAX_BALL_VERTICAL_SPEED
 
     def draw(self, screen):
         screen.blit(self.img, (self.x - self.radius, self.y - self.radius))
@@ -300,11 +312,17 @@ class Game:
         char1 = CHARACTERS[self.p1_selected_char]
         char2 = CHARACTERS[self.p2_selected_char]
         
-        self.p1 = Player(120, 380, char1, {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w, 'special': pygame.K_v}, 0)
-        self.p2 = Player(650, 380, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_m}, 1)
+        # Posicionar jogadores proporcionalmente à tela
+        p1_x = int(SCREEN_WIDTH * 0.15)
+        p1_y = int(SCREEN_HEIGHT * 0.65)
+        p2_x = int(SCREEN_WIDTH * 0.80)
+        p2_y = int(SCREEN_HEIGHT * 0.65)
+        
+        self.p1 = Player(p1_x, p1_y, char1, {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w, 'special': pygame.K_v}, 0)
+        self.p2 = Player(p2_x, p2_y, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_m}, 1)
         self.ball = Ball()
         self.goal_left = Goal(0, 0)
-        self.goal_right = Goal(SCREEN_WIDTH - 80, 1)
+        self.goal_right = Goal(SCREEN_WIDTH - 90, 1)
         
         self.game_time = 60
         self.current_time = 60
@@ -331,16 +349,28 @@ class Game:
             pass
 
     def check_collisions(self):
+        # Colisão entre jogadores - impedir atravessar
+        if self.p1.rect.colliderect(self.p2.rect):
+            overlap = self.p1.rect.right - self.p2.rect.left
+            if overlap > 0:
+                self.p1.rect.x -= overlap // 2
+                self.p2.rect.x += overlap // 2
+            self.p1.vel_x = 0
+            self.p2.vel_x = 0
+        
+        # Detectar se a bola está prensada
+        ball_between_players = (self.p1.rect.right > self.ball.x > self.p2.rect.left) or (self.p2.rect.right > self.ball.x > self.p1.rect.left)
+        
         for p in [self.p1, self.p2]:
             # Colisão com o corpo do jogador
             dx = self.ball.x - p.rect.centerx
             dy = self.ball.y - p.rect.centery
             dist = math.hypot(dx, dy)
-            collision_dist = 65 + self.ball.radius
+            collision_dist = 70 + self.ball.radius
             
             if dist < collision_dist and dist > 0:
                 angle = math.atan2(dy, dx)
-                force = 10
+                force = 12
                 vertical_force = 0
                 
                 # Se o jogador estiver chutando, aplica força extra
@@ -350,19 +380,24 @@ class Game:
                 
                 # Impulse-based collision (adicionar em vez de atribuir)
                 self.ball.vel_x += math.cos(angle) * force
-                self.ball.vel_y += vertical_force if p.kicking else math.sin(angle) * force
+                self.ball.vel_y += vertical_force if p.kicking else math.sin(angle) * force * 0.5
                 
                 # Separação para não prender a bola
-                overlap = collision_dist - dist + 5
+                overlap = collision_dist - dist + 8
                 self.ball.x += math.cos(angle) * overlap
                 self.ball.y += math.sin(angle) * overlap
+        
+        # Aplicar damping se a bola está prensada
+        if ball_between_players:
+            self.ball.vel_x *= 0.3
+            self.ball.vel_y *= 0.3
         
         # Colisão com o travessão do gol
         ball_rect = pygame.Rect(self.ball.x - self.ball.radius, self.ball.y - self.ball.radius, self.ball.radius * 2, self.ball.radius * 2)
         if ball_rect.colliderect(self.goal_left.crossbar):
-            self.ball.vel_y *= -0.75
+            self.ball.vel_y = abs(self.ball.vel_y) * -0.7
         if ball_rect.colliderect(self.goal_right.crossbar):
-            self.ball.vel_y *= -0.75
+            self.ball.vel_y = abs(self.ball.vel_y) * -0.7
 
         # Gols
         if self.goal_right.rect.collidepoint(self.ball.x, self.ball.y):
@@ -444,7 +479,9 @@ class Game:
             self.draw_character_select()
             return
         
-        self.screen.blit(Assets.background, (0, 0))
+        # Redimensionar fundo para fullscreen
+        bg = pygame.transform.scale(Assets.background, (SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen.blit(bg, (0, 0))
         pygame.draw.rect(self.screen, (35, 70, 25), (0, SCREEN_HEIGHT-40, SCREEN_WIDTH, 40)) # Chão
         
         self.goal_left.draw(self.screen)
