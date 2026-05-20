@@ -11,7 +11,7 @@ pygame.init()
 screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 SCREEN_WIDTH = screen.get_width()
 SCREEN_HEIGHT = screen.get_height()
-pygame.display.set_caption("Head Soccer Classic - Futebol Raiz")
+pygame.display.set_caption("Head Soccer BR")
 FPS = 60
 
 # Caminhos dos Assets
@@ -25,10 +25,13 @@ BALL_GRAVITY = 0.24
 BOUNCE = 0.72
 BALL_FRICTION = 0.98
 FRICTION = 0.985
-MAX_BALL_SPEED = 22
-MAX_BALL_VERTICAL_SPEED = 22
-KICK_FORCE_MULTIPLIER = 1.3
-KICK_UPWARD_FORCE = 8
+MAX_BALL_SPEED = 28
+MAX_BALL_VERTICAL_SPEED = 30
+# Configurações de Força e Altura do Chute
+KICK_FORCE_MIN = 22
+KICK_FORCE_MAX = 28
+KICK_UPWARD_LOW_BALL = -20   # Força para cima quando a bola está perto do chão
+KICK_UPWARD_HIGH_BALL = -10  # Força para cima quando a bola está alta
 
 # Cores
 WHITE = (255, 255, 255)
@@ -219,6 +222,15 @@ class Player:
         self.shoe_hitbox.center = (int(shoe_x), int(shoe_y))
 
     def draw(self, screen):
+        shoe_img = Assets.shoe if self.side == 0 else Assets.shoe_r
+        if self.shoe_angle != 0:
+            shoe_img = pygame.transform.rotate(shoe_img, self.shoe_angle if self.side == 0 else -self.shoe_angle)
+        
+        shoe_x = self.rect.centerx + self.shoe_offset_x + (90 if self.side == 0 else -90)
+        shoe_y = self.rect.centery + self.shoe_offset_y + 55
+        shoe_rect = shoe_img.get_rect(center=(int(shoe_x), int(shoe_y)))
+        screen.blit(shoe_img, shoe_rect)
+
         img = self.head_img if self.vel_x >= 0 else self.head_img_r
         if self.side == 1 and self.vel_x <= 0:
             img = self.head_img_r
@@ -230,15 +242,6 @@ class Player:
             img = self.head_img
         
         screen.blit(img, (self.rect.x - self.hitbox_offset_x, self.rect.y))
-        
-        shoe_img = Assets.shoe if self.side == 0 else Assets.shoe_r
-        if self.shoe_angle != 0:
-            shoe_img = pygame.transform.rotate(shoe_img, self.shoe_angle if self.side == 0 else -self.shoe_angle)
-        
-        shoe_x = self.rect.centerx + self.shoe_offset_x + (90 if self.side == 0 else -90)
-        shoe_y = self.rect.centery + self.shoe_offset_y + 55
-        shoe_rect = shoe_img.get_rect(center=(int(shoe_x), int(shoe_y)))
-        screen.blit(shoe_img, shoe_rect)
 
 class Ball:
     def __init__(self):
@@ -314,7 +317,7 @@ class Ball:
 class Goal:
     def __init__(self, x, side):
         self.rect = pygame.Rect(x, SCREEN_HEIGHT - 400, 125, 360)
-        self.crossbar = pygame.Rect(x, SCREEN_HEIGHT - 400, 125, 16)
+        self.crossbar = pygame.Rect(x, SCREEN_HEIGHT - 400, 125, 30)
         self.side = side
         if os.path.exists(os.path.join(IMAGES_DIR, "goal.png")):
             self.img = pygame.transform.scale(Assets.goal_img, (125, 360))
@@ -357,7 +360,7 @@ class Game:
         self.p2 = Player(SCREEN_WIDTH - 325, SCREEN_HEIGHT - 220, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_RETURN}, 1)
         self.ball = Ball()
         self.goal_left = Goal(0, 0)
-        self.goal_right = Goal(SCREEN_WIDTH - 110, 1)
+        self.goal_right = Goal(SCREEN_WIDTH - 125, 1)
         
         self.game_time = 60
         self.current_time = 60
@@ -445,54 +448,75 @@ class Game:
         ball_rect = pygame.Rect(self.ball.x - self.ball.radius, self.ball.y - self.ball.radius, self.ball.radius * 2, self.ball.radius * 2)
 
         for p in [self.p1, self.p2]:
-            if p.kicking and hasattr(p, 'shoe_hitbox') and p.shoe_hitbox.colliderect(ball_rect):
+            collided_with_shoe = False
+            if hasattr(p, 'shoe_hitbox') and p.shoe_hitbox.colliderect(ball_rect):
+                collided_with_shoe = True
                 dx = self.ball.x - p.shoe_hitbox.centerx
                 dy = self.ball.y - p.shoe_hitbox.centery
                 angle = math.atan2(dy, dx)
-                force = random.uniform(22, 26)
                 
-                vertical_boost = -6 if self.ball.y > SCREEN_HEIGHT - 140 else -2
-                
-                cos_val = abs(math.cos(angle))
-                if cos_val < 0.7:
-                    cos_val = 0.7
-                
-                if p.side == 0:
-                    self.ball.vel_x = cos_val * force
+                if p.kicking:
+                    force = random.uniform(KICK_FORCE_MIN, KICK_FORCE_MAX)
+                    vertical_boost = KICK_UPWARD_LOW_BALL if self.ball.y > SCREEN_HEIGHT - 140 else KICK_UPWARD_HIGH_BALL
+                    
+                    cos_val = abs(math.cos(angle))
+                    if cos_val < 0.7:
+                        cos_val = 0.7
+                    
+                    if p.side == 0:
+                        self.ball.vel_x = cos_val * force
+                    else:
+                        self.ball.vel_x = -cos_val * force
+                    
+                    self.ball.vel_y = vertical_boost
+                    self.ball.angle_speed = self.ball.vel_x * 0.05
+                    
+                    overlap = (self.ball.radius + 80) - math.hypot(dx, dy)
+                    if overlap > 0:
+                        push_dir = 1 if p.side == 0 else -1
+                        self.ball.x += push_dir * overlap
+                        self.ball.y -= overlap
                 else:
-                    self.ball.vel_x = -cos_val * force
-                
-                self.ball.vel_y = vertical_boost
-                self.ball.angle_speed = self.ball.vel_x * 0.05
-                
-                overlap = (self.ball.radius + 80) - math.hypot(dx, dy)
-                if overlap > 0:
-                    push_dir = 1 if p.side == 0 else -1
-                    self.ball.x += push_dir * overlap
-                    self.ball.y -= overlap
+                    # Colisão passiva/rebote na chuteira (quando não está chutando)
+                    bounce_force = 10
+                    self.ball.vel_x = math.cos(angle) * bounce_force
+                    self.ball.vel_y = math.sin(angle) * bounce_force
+                    
+                    dist = math.hypot(dx, dy)
+                    overlap = (self.ball.radius + 75) - dist
+                    if overlap > 0:
+                        self.ball.x += math.cos(angle) * overlap
+                        self.ball.y += math.sin(angle) * overlap
 
-            dx = self.ball.x - p.rect.centerx
-            dy = self.ball.y - p.rect.centery
-            dist = math.hypot(dx, dy)
-            collision_dist = 67 + self.ball.radius
-            
-            if dist < collision_dist and dist > 0:
-                angle = math.atan2(dy, dx)
-                force = 10
+            if not collided_with_shoe:
+                dx = self.ball.x - p.rect.centerx
+                dy = self.ball.y - p.rect.centery
+                dist = math.hypot(dx, dy)
+                collision_dist = 67 + self.ball.radius
                 
-                self.ball.vel_x += math.cos(angle) * force
-                self.ball.vel_y += math.sin(angle) * force
-                
-                overlap = collision_dist - dist
-                self.ball.x += math.cos(angle) * overlap
-                self.ball.y += math.sin(angle) * overlap
+                if dist < collision_dist and dist > 0:
+                    angle = math.atan2(dy, dx)
+                    force = 10
+                    
+                    self.ball.vel_x += math.cos(angle) * force
+                    self.ball.vel_y += math.sin(angle) * force
+                    
+                    overlap = collision_dist - dist
+                    self.ball.x += math.cos(angle) * overlap
+                    self.ball.y += math.sin(angle) * overlap
         
         # Colisão com o travessão do gol
         ball_rect = pygame.Rect(self.ball.x - self.ball.radius, self.ball.y - self.ball.radius, self.ball.radius * 2, self.ball.radius * 2)
-        if ball_rect.colliderect(self.goal_left.crossbar):
-            self.ball.vel_y *= -0.75
-        if ball_rect.colliderect(self.goal_right.crossbar):
-            self.ball.vel_y *= -0.75
+        for goal in [self.goal_left, self.goal_right]:
+            if ball_rect.colliderect(goal.crossbar):
+                if self.ball.y < goal.crossbar.centery:
+                    self.ball.y = goal.crossbar.top - self.ball.radius
+                    if self.ball.vel_y > 0:
+                        self.ball.vel_y = -self.ball.vel_y * 0.75
+                else:
+                    self.ball.y = goal.crossbar.bottom + self.ball.radius
+                    if self.ball.vel_y < 0:
+                        self.ball.vel_y = -self.ball.vel_y * 0.75
 
         # Gols
         if self.goal_right.rect.collidepoint(self.ball.x, self.ball.y):
@@ -679,20 +703,20 @@ class Game:
 
         # UI - Placar com nomes reais
         # Jogador 1 (Esquerda)
-        p1_label = self.small_font.render(self.p1.name, True, WHITE)
-        p1_score = self.large_font.render(str(self.p1.score), True, WHITE)
+        p1_label = self.small_font.render(self.p1.name, True, BLACK)
+        p1_score = self.large_font.render(str(self.p1.score), True, BLACK)
         self.screen.blit(p1_label, (50, 15))
         self.screen.blit(p1_score, (50, 45))
         
         # Jogador 2 (Direita)
-        p2_label = self.small_font.render(self.p2.name, True, WHITE)
-        p2_score = self.large_font.render(str(self.p2.score), True, WHITE)
+        p2_label = self.small_font.render(self.p2.name, True, BLACK)
+        p2_score = self.large_font.render(str(self.p2.score), True, BLACK)
         self.screen.blit(p2_label, (SCREEN_WIDTH - 50 - p2_label.get_width(), 15))
         self.screen.blit(p2_score, (SCREEN_WIDTH - 50 - p2_score.get_width(), 45))
         
         # Timer Central
         t_val = self.current_time if self.state in ["PLAYING", "GOLDEN_GOAL"] else self.game_time
-        timer_color = (255, 215, 0) if self.state == "GOLDEN_GOAL" else YELLOW
+        timer_color = (255, 215, 0) if self.state == "GOLDEN_GOAL" else BLACK
         timer_text = self.large_font.render(str(max(0, t_val)), True, timer_color)
         self.screen.blit(timer_text, (SCREEN_WIDTH//2 - timer_text.get_width()//2, 20))
 
@@ -711,17 +735,18 @@ class Game:
                 self.state = "PLAYING"
                 self.start_ticks += 2000
         elif self.state == "GOLDEN_GOAL":
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 100))
-            self.screen.blit(overlay, (0, 0))
-            golden_text = self.large_font.render("GOL DE OURO!", True, (255, 215, 0))
-            self.screen.blit(golden_text, (SCREEN_WIDTH//2 - golden_text.get_width()//2, SCREEN_HEIGHT//2))
+            if pygame.time.get_ticks() - self.start_ticks < 3000:
+                overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 100))
+                self.screen.blit(overlay, (0, 0))
+                golden_text = self.large_font.render("GOL DE OURO!", True, (255, 215, 0))
+                self.screen.blit(golden_text, (SCREEN_WIDTH//2 - golden_text.get_width()//2, SCREEN_HEIGHT//2))
         elif self.state == "END":
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 200))
             self.screen.blit(overlay, (0, 0))
             win_text = self.large_font.render(self.winner, True, YELLOW)
-            restart_text = self.font.render("Pressione R para reiniciar", True, WHITE)
+            restart_text = self.font.render("Pressione R para voltar ao menu", True, WHITE)
             self.screen.blit(win_text, (SCREEN_WIDTH//2 - win_text.get_width()//2, SCREEN_HEIGHT//2 - 50))
             self.screen.blit(restart_text, (SCREEN_WIDTH//2 - restart_text.get_width()//2, SCREEN_HEIGHT//2 + 50))
 
@@ -762,13 +787,19 @@ class Game:
 
                 if event.type == pygame.KEYDOWN:
                     if self.state == "SPLASH":
-                        self.state = "MENU"
+                        if event.key == pygame.K_ESCAPE:
+                            pygame.quit()
+                            sys.exit()
+                        else:
+                            self.state = "MENU"
                     elif self.state == "MENU":
                         if event.key in [pygame.K_w, pygame.K_UP]: self.menu_option = (self.menu_option - 1) % 2
                         elif event.key in [pygame.K_s, pygame.K_DOWN]: self.menu_option = (self.menu_option + 1) % 2
                         elif event.key == pygame.K_RETURN:
                             if self.menu_option == 0: self.state = "CHARACTER_SELECT"
                             else: pygame.quit(); sys.exit()
+                        elif event.key == pygame.K_ESCAPE:
+                            self.state = "SPLASH"
                     
                     elif self.state == "CHARACTER_SELECT":
                         if event.key == pygame.K_w: self.p1_selected_char = (self.p1_selected_char - 2) % 4
@@ -789,6 +820,8 @@ class Game:
                             self.reset_game()
                             self.state = "PLAYING"
                             self.start_ticks = pygame.time.get_ticks()
+                        elif event.key == pygame.K_ESCAPE:
+                            self.state = "MENU"
                     
                     elif self.state == "PLAYING":
                         if event.key == pygame.K_ESCAPE:
