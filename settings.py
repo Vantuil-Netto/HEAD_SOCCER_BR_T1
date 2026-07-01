@@ -12,6 +12,9 @@ ASSETS_DIR: str = os.path.join(os.path.dirname(__file__), "assets")
 IMAGES_DIR: str = os.path.join(ASSETS_DIR, "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
+pygame.mixer.init()
+SOUNDS_DIR: str = os.path.join(ASSETS_DIR, "sounds")
+
 GRAVITY: float = 0.45
 BALL_GRAVITY: float = 0.24
 BOUNCE: float = 0.72

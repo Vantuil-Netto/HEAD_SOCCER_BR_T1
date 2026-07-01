@@ -1,7 +1,7 @@
 import pygame
 import os
 from settings import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, IMAGES_DIR,
+    SCREEN_WIDTH, SCREEN_HEIGHT, IMAGES_DIR, ASSETS_DIR,
     WHITE, RED, YELLOW, BLUE, GRAY, GREEN, BLACK, CHARACTERS
 )
 
@@ -73,3 +73,11 @@ class Assets:
         start_background = pygame.transform.scale(start_background, (SCREEN_WIDTH, SCREEN_HEIGHT))
     else:
         start_background = background
+
+    SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
+    whistle_start = pygame.mixer.Sound(os.path.join(SOUNDS_DIR, "apito inicio de jogo.wav"))
+    whistle_end = pygame.mixer.Sound(os.path.join(SOUNDS_DIR, "apito fim de jogo.wav"))
+    hit_sound = pygame.mixer.Sound(os.path.join(SOUNDS_DIR, "hit da bola.wav"))
+    goal_sound = pygame.mixer.Sound(os.path.join(SOUNDS_DIR, "golaço.wav"))
+
+pygame.mixer.music.load(os.path.join(Assets.SOUNDS_DIR, "musica_tema.mp3"))

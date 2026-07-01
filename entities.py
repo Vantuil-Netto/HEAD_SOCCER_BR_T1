@@ -163,6 +163,8 @@ class Ball:
         if 0 < abs(self.vel_x) < 0.1:
             self.vel_x *= 1.02
 
+        hit_occurred = False
+
         for _ in range(2):
             self.x += self.vel_x * 0.5
             self.y += self.vel_y * 0.5
@@ -173,18 +175,25 @@ class Ball:
                     self.vel_y = -self.vel_y * BOUNCE
                 if abs(self.vel_y) < 1:
                     self.vel_y = 0
+                hit_occurred = True
 
             if self.x - self.radius < 0:
                 self.x = self.radius
                 self.vel_x = abs(self.vel_x) * 0.6
+                hit_occurred = True
             elif self.x + self.radius > SCREEN_WIDTH:
                 self.x = SCREEN_WIDTH - self.radius
                 self.vel_x = -abs(self.vel_x) * 0.6
+                hit_occurred = True
 
             if self.y - self.radius < 0:
                 self.y = self.radius
                 if self.vel_y < 0:
                     self.vel_y = 0
+                hit_occurred = True
+
+        if hit_occurred:
+            Assets.hit_sound.play()
 
         if abs(self.vel_x) > MAX_BALL_SPEED:
             self.vel_x = (self.vel_x / abs(self.vel_x)) * MAX_BALL_SPEED

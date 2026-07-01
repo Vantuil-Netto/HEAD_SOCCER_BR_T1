@@ -11,6 +11,8 @@ from settings import (
 from assets import Assets
 from entities import Player, Ball, Goal
 
+MUSIC_LOOP_EVENT = pygame.USEREVENT + 1
+
 
 class Game:
     def __init__(self) -> None:
@@ -28,6 +30,7 @@ class Game:
         self.p1_selected_char = 0
         self.p2_selected_char = 1
 
+        self._end_sound_played: bool = False
         self.reset_game()
 
     def reset_game(self) -> None:
@@ -46,6 +49,7 @@ class Game:
         self.winner = ""
         self.last_conceded_by = 0
         self.is_golden_goal = False
+        self._end_sound_played = False
 
     def update(self) -> None:
         if self.state == "PLAYING":
@@ -123,6 +127,7 @@ class Game:
             collided_with_shoe = False
             if hasattr(p, 'shoe_hitbox') and p.shoe_hitbox.colliderect(ball_rect):
                 collided_with_shoe = True
+                Assets.hit_sound.play()
                 dx = self.ball.x - p.shoe_hitbox.centerx
                 dy = self.ball.y - p.shoe_hitbox.centery
                 angle = math.atan2(dy, dx)
@@ -166,6 +171,7 @@ class Game:
                 collision_dist = 67 + self.ball.radius
 
                 if dist < collision_dist and dist > 0:
+                    Assets.hit_sound.play()
                     angle = math.atan2(dy, dx)
                     force = 10
 
@@ -179,6 +185,7 @@ class Game:
         ball_rect = pygame.Rect(self.ball.x - self.ball.radius, self.ball.y - self.ball.radius, self.ball.radius * 2, self.ball.radius * 2)
         for goal in [self.goal_left, self.goal_right]:
             if ball_rect.colliderect(goal.crossbar):
+                Assets.hit_sound.play()
                 if self.ball.y < goal.crossbar.centery:
                     self.ball.y = goal.crossbar.top - self.ball.radius
                     if self.ball.vel_y > 0:
@@ -190,6 +197,7 @@ class Game:
 
         if self.goal_right.rect.collidepoint(self.ball.x, self.ball.y):
             self.p1.score += 1
+            Assets.goal_sound.play(maxtime=5000)
             if self.is_golden_goal:
                 self.state = "END"
                 self.winner = f"{self.p1.name} VENCEU! (GOL DE OURO)"
@@ -197,6 +205,7 @@ class Game:
                 self.trigger_goal(f"GOL DE {self.p1.name.upper()}!", conceded_by=2)
         elif self.goal_left.rect.collidepoint(self.ball.x, self.ball.y):
             self.p2.score += 1
+            Assets.goal_sound.play(maxtime=5000)
             if self.is_golden_goal:
                 self.state = "END"
                 self.winner = f"{self.p2.name} VENCEU! (GOL DE OURO)"
@@ -405,6 +414,9 @@ class Game:
                 golden_text = self.large_font.render("GOL DE OURO!", True, YELLOW)
                 self.screen.blit(golden_text, (SCREEN_WIDTH // 2 - golden_text.get_width() // 2, SCREEN_HEIGHT // 2))
         elif self.state == "END":
+            if not self._end_sound_played:
+                Assets.whistle_end.play()
+                self._end_sound_played = True
             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 200))
             self.screen.blit(overlay, (0, 0))
@@ -415,12 +427,24 @@ class Game:
 
         pygame.display.flip()
 
+    def _start_menu_music(self) -> None:
+        pygame.mixer.music.play(start=33.0)
+        pygame.time.set_timer(MUSIC_LOOP_EVENT, 228000)
+
+    def _stop_menu_music(self) -> None:
+        pygame.mixer.music.stop()
+        pygame.time.set_timer(MUSIC_LOOP_EVENT, 0)
+
     def run(self) -> None:
+        self._start_menu_music()
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+                if event.type == MUSIC_LOOP_EVENT:
+                    if self.state in ("SPLASH", "MENU", "CHARACTER_SELECT"):
+                        pygame.mixer.music.play(start=33.0)
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if self.state == "SPLASH":
@@ -442,9 +466,12 @@ class Game:
                                 elif i == 1:
                                     self.reset_game()
                                     self.state = "PLAYING"
+                                    Assets.whistle_start.play()
+                                    self._stop_menu_music()
                                     self.start_ticks = pygame.time.get_ticks()
                                 elif i == 2:
                                     self.state = "MENU"
+                                    self._start_menu_music()
                     elif self.state == "CHARACTER_SELECT":
                         for i, rect in enumerate(self.char_rects):
                             if rect.collidepoint(event.pos):
@@ -500,6 +527,8 @@ class Game:
                         elif event.key == pygame.K_RETURN:
                             self.reset_game()
                             self.state = "PLAYING"
+                            Assets.whistle_start.play()
+                            self._stop_menu_music()
                             self.start_ticks = pygame.time.get_ticks()
                         elif event.key == pygame.K_ESCAPE:
                             self.state = "MENU"
@@ -521,15 +550,19 @@ class Game:
                             elif self.pause_option == 1:
                                 self.reset_game()
                                 self.state = "PLAYING"
+                                Assets.whistle_start.play()
+                                self._stop_menu_music()
                                 self.start_ticks = pygame.time.get_ticks()
                             elif self.pause_option == 2:
                                 self.state = "MENU"
+                                self._start_menu_music()
                         elif event.key == pygame.K_ESCAPE:
                             self.state = "PLAYING"
                             self.start_ticks += (pygame.time.get_ticks() - self.pause_start_ticks)
 
                     elif self.state == "END" and event.key == pygame.K_r:
                         self.state = "MENU"
+                        self._start_menu_music()
 
             self.update()
             self.draw()
