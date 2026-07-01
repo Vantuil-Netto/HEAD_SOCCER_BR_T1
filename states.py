@@ -5,7 +5,7 @@ import random
 from settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS,
     WHITE, BLACK, RED, BLUE, GREEN, YELLOW, GRAY,
-    CHARACTERS, KICK_FORCE_MIN, KICK_FORCE_MAX,
+    CHARACTERS, ARENAS, KICK_FORCE_MIN, KICK_FORCE_MAX,
     KICK_UPWARD_LOW_BALL, KICK_UPWARD_HIGH_BALL
 )
 from assets import Assets
@@ -26,9 +26,11 @@ class Game:
         self.state = "SPLASH"
         self.menu_option = 0
         self.pause_option = 0
+        self.field_select_option = 0
 
         self.p1_selected_char = 0
         self.p2_selected_char = 1
+        self.current_arena_key: str = "Grama"
 
         self._end_sound_played: bool = False
         self.reset_game()
@@ -36,10 +38,11 @@ class Game:
     def reset_game(self) -> None:
         char1 = CHARACTERS[self.p1_selected_char]
         char2 = CHARACTERS[self.p2_selected_char]
+        arena = ARENAS[self.current_arena_key]
 
-        self.p1 = Player(180, SCREEN_HEIGHT - 220, char1, {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w, 'special': pygame.K_SPACE}, 0)
-        self.p2 = Player(SCREEN_WIDTH - 325, SCREEN_HEIGHT - 220, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_RETURN}, 1)
-        self.ball = Ball()
+        self.p1 = Player(180, SCREEN_HEIGHT - 220, char1, {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w, 'special': pygame.K_SPACE}, 0, arena, self.current_arena_key)
+        self.p2 = Player(SCREEN_WIDTH - 325, SCREEN_HEIGHT - 220, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_RETURN}, 1, arena, self.current_arena_key)
+        self.ball = Ball(arena)
         self.goal_left = Goal(0, 0)
         self.goal_right = Goal(SCREEN_WIDTH - 125, 1)
 
@@ -95,6 +98,8 @@ class Game:
             self.check_collisions()
 
         elif self.state == "PAUSED":
+            pass
+        elif self.state == "FIELD_SELECT":
             pass
 
     def check_collisions(self) -> None:
@@ -357,6 +362,62 @@ class Game:
         self.screen.blit(hint_text2, (SCREEN_WIDTH - 50 - hint_text2.get_width(), SCREEN_HEIGHT - 60))
         pygame.display.flip()
 
+    def draw_field_select(self) -> None:
+        mouse_pos = pygame.mouse.get_pos()
+        self.screen.blit(Assets.background, (0, 0))
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))
+        self.screen.blit(overlay, (0, 0))
+
+        title_text = self.large_font.render("SELECIONE O CAMPO", True, YELLOW)
+        self.screen.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 40))
+
+        arena_list = list(ARENAS.items())
+        key, data = arena_list[self.field_select_option]
+
+        preview_w, preview_h = 400, 400
+        preview_x = SCREEN_WIDTH // 2 - preview_w // 2
+        preview_y = 130
+        preview_rect = pygame.Rect(preview_x, preview_y, preview_w, preview_h)
+        self.field_rects = [preview_rect]
+
+        shadow = preview_rect.copy()
+        shadow.x += 8
+        shadow.y += 8
+        pygame.draw.rect(self.screen, (0, 0, 0, 80), shadow, border_radius=12)
+        pygame.draw.rect(self.screen, (30, 30, 30), preview_rect, border_radius=12)
+        inner_rect = preview_rect.inflate(-12, -12)
+        self.screen.blit(Assets.arena_previews[key], inner_rect.topleft)
+        pygame.draw.rect(self.screen, YELLOW, preview_rect, 4, border_radius=12)
+
+        arrow_y = preview_y + preview_h // 2 - 25
+        lx = preview_x - 60
+        rx = preview_x + preview_w + 20
+        left_arrow_rect = pygame.Rect(lx, arrow_y, 50, 50)
+        right_arrow_rect = pygame.Rect(rx, arrow_y, 50, 50)
+        self.field_rects.extend([left_arrow_rect, right_arrow_rect])
+
+        l_hover = left_arrow_rect.collidepoint(mouse_pos)
+        r_hover = right_arrow_rect.collidepoint(mouse_pos)
+        l_color = (100, 100, 100) if l_hover else (50, 50, 50)
+        r_color = (100, 100, 100) if r_hover else (50, 50, 50)
+
+        for r, c in ((left_arrow_rect, l_color), (right_arrow_rect, r_color)):
+            pygame.draw.rect(self.screen, (0, 0, 0), (r.x + 3, r.y + 3, r.w, r.h), border_radius=8)
+            pygame.draw.rect(self.screen, c, r, border_radius=8)
+
+        arr = self.font.render("<", True, WHITE)
+        self.screen.blit(arr, (left_arrow_rect.centerx - arr.get_width() // 2, left_arrow_rect.centery - arr.get_height() // 2))
+        arr = self.font.render(">", True, WHITE)
+        self.screen.blit(arr, (right_arrow_rect.centerx - arr.get_width() // 2, right_arrow_rect.centery - arr.get_height() // 2))
+
+        name_text = self.button_font.render(data["label"], True, WHITE)
+        self.screen.blit(name_text, (SCREEN_WIDTH // 2 - name_text.get_width() // 2, preview_y + preview_h + 20))
+
+        hint_text = self.font.render("← →: Navegar    ENTER: Confirmar    ESC: Voltar", True, (200, 200, 200))
+        self.screen.blit(hint_text, (SCREEN_WIDTH // 2 - hint_text.get_width() // 2, SCREEN_HEIGHT - 60))
+        pygame.display.flip()
+
     def draw(self) -> None:
         if self.state == "SPLASH":
             self.draw_splash()
@@ -367,8 +428,11 @@ class Game:
         elif self.state == "CHARACTER_SELECT":
             self.draw_character_select()
             return
+        elif self.state == "FIELD_SELECT":
+            self.draw_field_select()
+            return
 
-        self.screen.blit(Assets.background, (0, 0))
+        self.screen.blit(Assets.arena_backgrounds[self.current_arena_key], (0, 0))
         pygame.draw.rect(self.screen, (35, 70, 25), (0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40))
 
         self.goal_left.draw(self.screen)
@@ -443,7 +507,7 @@ class Game:
                     pygame.quit()
                     sys.exit()
                 if event.type == MUSIC_LOOP_EVENT:
-                    if self.state in ("SPLASH", "MENU", "CHARACTER_SELECT"):
+                    if self.state in ("SPLASH", "MENU", "CHARACTER_SELECT", "FIELD_SELECT"):
                         pygame.mixer.music.play(start=33.0)
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
@@ -479,6 +543,20 @@ class Game:
                                     self.p1_selected_char = i
                                 elif event.button == 3:
                                     self.p2_selected_char = i
+                    elif self.state == "FIELD_SELECT" and event.button == 1:
+                        for i, rect in enumerate(self.field_rects):
+                            if rect.collidepoint(event.pos):
+                                if i == 0:
+                                    self.current_arena_key = list(ARENAS.keys())[self.field_select_option]
+                                    self.reset_game()
+                                    self.state = "PLAYING"
+                                    Assets.whistle_start.play()
+                                    self._stop_menu_music()
+                                    self.start_ticks = pygame.time.get_ticks()
+                                elif i == 1:
+                                    self.field_select_option = (self.field_select_option - 1) % len(ARENAS)
+                                elif i == 2:
+                                    self.field_select_option = (self.field_select_option + 1) % len(ARENAS)
 
                 if event.type == pygame.KEYDOWN:
                     if self.state == "SPLASH":
@@ -525,13 +603,25 @@ class Game:
                                 self.p2_selected_char += 1
 
                         elif event.key == pygame.K_RETURN:
+                            self.state = "FIELD_SELECT"
+                            self.field_select_option = 0
+                        elif event.key == pygame.K_ESCAPE:
+                            self.state = "MENU"
+
+                    elif self.state == "FIELD_SELECT":
+                        if event.key in (pygame.K_a, pygame.K_LEFT):
+                            self.field_select_option = (self.field_select_option - 1) % len(ARENAS)
+                        elif event.key in (pygame.K_d, pygame.K_RIGHT):
+                            self.field_select_option = (self.field_select_option + 1) % len(ARENAS)
+                        elif event.key == pygame.K_RETURN:
+                            self.current_arena_key = list(ARENAS.keys())[self.field_select_option]
                             self.reset_game()
                             self.state = "PLAYING"
                             Assets.whistle_start.play()
                             self._stop_menu_music()
                             self.start_ticks = pygame.time.get_ticks()
                         elif event.key == pygame.K_ESCAPE:
-                            self.state = "MENU"
+                            self.state = "CHARACTER_SELECT"
 
                     elif self.state == "PLAYING":
                         if event.key == pygame.K_ESCAPE:

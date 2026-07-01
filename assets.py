@@ -2,7 +2,7 @@ import pygame
 import os
 from settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, IMAGES_DIR, ASSETS_DIR,
-    WHITE, RED, YELLOW, BLUE, GRAY, GREEN, BLACK, CHARACTERS
+    WHITE, RED, YELLOW, BLUE, GRAY, GREEN, BLACK, CHARACTERS, ARENAS
 )
 
 
@@ -15,8 +15,8 @@ def load_image(name: str, fallback_color=WHITE, size=(100, 100)) -> pygame.Surfa
     return surf
 
 
-def load_shoe_sprite():
-    shoe_path = os.path.join(IMAGES_DIR, "chuteira.png")
+def load_shoe_sprite(filename: str):
+    shoe_path = os.path.join(IMAGES_DIR, filename)
     if os.path.exists(shoe_path):
         shoe = pygame.image.load(shoe_path).convert_alpha()
         shoe = pygame.transform.scale(shoe, (150, 90))
@@ -54,12 +54,15 @@ class Assets:
 
     logo_raw = load_image("logo.png", fallback_color=YELLOW, size=(450, 170))
     logo = pygame.transform.scale(logo_raw, (450, 215))
-    shoe, shoe_r = load_shoe_sprite()
+    arena_shoes = {
+        "Grama": load_shoe_sprite("chuteira_azul.png"),
+        "Gelo": load_shoe_sprite("chuteira_rosa.png"),
+    }
     ball = load_image("new_ball.png", fallback_color=WHITE, size=(56, 56))
     goal_img = load_image("goal.png", fallback_color=GRAY, size=(100, 200))
     goal_img_r = pygame.transform.flip(goal_img, True, False)
 
-    bg_path = os.path.join(IMAGES_DIR, "new_background.png")
+    bg_path = os.path.join(IMAGES_DIR, "campo_grama.png")
     if os.path.exists(bg_path):
         background = pygame.image.load(bg_path).convert()
         background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -73,6 +76,22 @@ class Assets:
         start_background = pygame.transform.scale(start_background, (SCREEN_WIDTH, SCREEN_HEIGHT))
     else:
         start_background = background
+
+    arena_backgrounds = {}
+    arena_previews = {}
+    for key, data in ARENAS.items():
+        path = os.path.join(IMAGES_DIR, data["bg_file"])
+        if os.path.exists(path):
+            bg = pygame.image.load(path).convert()
+            bg = pygame.transform.scale(bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            prev = pygame.transform.smoothscale(bg, (400, 400))
+        else:
+            bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            bg.fill(data["fallback_color"])
+            prev = pygame.Surface((400, 400))
+            prev.fill(data["fallback_color"])
+        arena_backgrounds[key] = bg
+        arena_previews[key] = prev
 
     SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
     whistle_start = pygame.mixer.Sound(os.path.join(SOUNDS_DIR, "apito inicio de jogo.wav"))

@@ -3,16 +3,13 @@ import math
 import random
 import os
 from settings import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, GRAVITY, BALL_GRAVITY, BOUNCE,
-    BALL_FRICTION, FRICTION, MAX_BALL_SPEED, MAX_BALL_VERTICAL_SPEED,
-    KICK_FORCE_MIN, KICK_FORCE_MAX, KICK_UPWARD_LOW_BALL, KICK_UPWARD_HIGH_BALL,
-    GRAY, IMAGES_DIR
+    SCREEN_WIDTH, SCREEN_HEIGHT, GRAY, IMAGES_DIR
 )
 from assets import Assets
 
 
 class Player:
-    def __init__(self, x: int, y: int, char_data: dict, controls: dict, side: int) -> None:
+    def __init__(self, x: int, y: int, char_data: dict, controls: dict, side: int, arena: dict, arena_key: str = "Grama") -> None:
         self.initial_x: int = x
         self.initial_y: int = y
         self.rect: pygame.Rect = pygame.Rect(x, y, 145, 175)
@@ -21,14 +18,16 @@ class Player:
         self.key: str = char_data["key"]
         self.controls: dict = controls
         self.side: int = side
+        self.arena: dict = arena
+        self.arena_key: str = arena_key
 
         self.head_img, self.head_img_r = Assets.heads[self.key]
         self.current_img = self.head_img if side == 0 else self.head_img_r
 
         self.vel_x: float = 0
         self.vel_y: float = 0
-        self.speed: float = 4.5
-        self.jump_power: float = -13
+        self.speed: float = self.arena["player_speed"]
+        self.jump_power: float = self.arena["jump_power"]
         self.is_jumping: bool = False
         self.score: int = 0
 
@@ -91,7 +90,7 @@ class Player:
             self.kicking = True
             self.kick_animation_timer = pygame.time.get_ticks()
 
-        self.vel_y += GRAVITY
+        self.vel_y += self.arena["gravity"]
         self.rect.x += self.vel_x
         self.rect.y += self.vel_y
 
@@ -110,7 +109,7 @@ class Player:
         self.shoe_hitbox.center = (int(shoe_x), int(shoe_y))
 
     def draw(self, screen: pygame.Surface) -> None:
-        shoe_img = Assets.shoe if self.side == 0 else Assets.shoe_r
+        shoe_img = Assets.arena_shoes[self.arena_key][self.side]
         if self.shoe_angle != 0:
             shoe_img = pygame.transform.rotate(shoe_img, self.shoe_angle if self.side == 0 else -self.shoe_angle)
 
@@ -132,8 +131,9 @@ class Player:
 
 
 class Ball:
-    def __init__(self) -> None:
+    def __init__(self, arena: dict) -> None:
         self.radius: int = 48
+        self.arena: dict = arena
         self.img = pygame.transform.smoothscale(Assets.ball, (96, 96))
         self.x: float = 0
         self.y: float = 0
@@ -157,8 +157,8 @@ class Ball:
         self.angle_speed = 0
 
     def update(self) -> None:
-        self.vel_y += BALL_GRAVITY
-        self.vel_x *= 0.995
+        self.vel_y += self.arena["ball_gravity"]
+        self.vel_x *= self.arena["friction"]
 
         if 0 < abs(self.vel_x) < 0.1:
             self.vel_x *= 1.02
@@ -172,18 +172,18 @@ class Ball:
             if self.y + self.radius >= SCREEN_HEIGHT - 40:
                 self.y = SCREEN_HEIGHT - 40 - self.radius
                 if self.vel_y > 0:
-                    self.vel_y = -self.vel_y * BOUNCE
+                    self.vel_y = -self.vel_y * self.arena["bounce"]
                 if abs(self.vel_y) < 1:
                     self.vel_y = 0
                 hit_occurred = True
 
             if self.x - self.radius < 0:
                 self.x = self.radius
-                self.vel_x = abs(self.vel_x) * 0.6
+                self.vel_x = abs(self.vel_x) * self.arena["wall_bounce"]
                 hit_occurred = True
             elif self.x + self.radius > SCREEN_WIDTH:
                 self.x = SCREEN_WIDTH - self.radius
-                self.vel_x = -abs(self.vel_x) * 0.6
+                self.vel_x = -abs(self.vel_x) * self.arena["wall_bounce"]
                 hit_occurred = True
 
             if self.y - self.radius < 0:
@@ -195,10 +195,10 @@ class Ball:
         if hit_occurred:
             Assets.hit_sound.play()
 
-        if abs(self.vel_x) > MAX_BALL_SPEED:
-            self.vel_x = (self.vel_x / abs(self.vel_x)) * MAX_BALL_SPEED
-        if abs(self.vel_y) > MAX_BALL_VERTICAL_SPEED:
-            self.vel_y = (self.vel_y / abs(self.vel_y)) * MAX_BALL_VERTICAL_SPEED
+        if abs(self.vel_x) > self.arena["max_ball_speed"]:
+            self.vel_x = (self.vel_x / abs(self.vel_x)) * self.arena["max_ball_speed"]
+        if abs(self.vel_y) > self.arena["max_ball_vertical_speed"]:
+            self.vel_y = (self.vel_y / abs(self.vel_y)) * self.arena["max_ball_vertical_speed"]
 
         self.angle_speed += self.vel_x * 0.04
         self.angle += self.angle_speed

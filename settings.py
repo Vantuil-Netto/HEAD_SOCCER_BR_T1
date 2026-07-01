@@ -45,3 +45,34 @@ CHARACTERS: list[dict] = [
     {"name": "Kaká", "file": "kaka_head.png", "key": "Alemanha"},
     {"name": "Neymar Junior", "file": "neymarjr_head.png", "key": "Argentina"}
 ]
+
+ARENAS: dict[str, dict] = {
+    "Grama": {
+        "gravity": 0.45,
+        "ball_gravity": 0.24,
+        "bounce": 0.72,
+        "friction": 0.98,
+        "player_speed": 4.5,
+        "jump_power": -13,
+        "wall_bounce": 0.6,
+        "max_ball_speed": 28,
+        "max_ball_vertical_speed": 30,
+        "bg_file": "campo_grama.png",
+        "fallback_color": (34, 139, 34),
+        "label": "Grama (Normal)",
+    },
+    "Gelo": {
+        "gravity": 0.40,
+        "ball_gravity": 0.22,
+        "bounce": 0.80,
+        "friction": 0.998,
+        "player_speed": 5.5,
+        "jump_power": -12,
+        "wall_bounce": 0.7,
+        "max_ball_speed": 28,
+        "max_ball_vertical_speed": 30,
+        "bg_file": "campo_gelo.jpg",
+        "fallback_color": (200, 230, 255),
+        "label": "Gelo (Escorregadio)",
+    },
+}
