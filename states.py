@@ -31,6 +31,7 @@ class Game:
         self.p1_selected_char = 0
         self.p2_selected_char = 1
         self.current_arena_key: str = "Grama"
+        self.game_mode: str = "2P"
 
         self._end_sound_played: bool = False
         self.reset_game()
@@ -41,7 +42,7 @@ class Game:
         arena = ARENAS[self.current_arena_key]
 
         self.p1 = Player(180, SCREEN_HEIGHT - 220, char1, {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w, 'special': pygame.K_SPACE}, 0, arena, self.current_arena_key)
-        self.p2 = Player(SCREEN_WIDTH - 325, SCREEN_HEIGHT - 220, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_RETURN}, 1, arena, self.current_arena_key)
+        self.p2 = Player(SCREEN_WIDTH - 325, SCREEN_HEIGHT - 220, char2, {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP, 'special': pygame.K_RETURN}, 1, arena, self.current_arena_key, is_ai=(self.game_mode == "1P"))
         self.ball = Ball(arena)
         self.goal_left = Goal(0, 0)
         self.goal_right = Goal(SCREEN_WIDTH - 125, 1)
@@ -80,7 +81,7 @@ class Game:
                     self.start_ticks = pygame.time.get_ticks()
 
             self.p1.update()
-            self.p2.update()
+            self.p2.update(self.ball.x, self.ball.y)
             self.ball.update()
             self.check_collisions()
 
@@ -93,7 +94,7 @@ class Game:
                 self.winner = "EMPATE! (Ninguém marcou no Golden Goal)"
 
             self.p1.update()
-            self.p2.update()
+            self.p2.update(self.ball.x, self.ball.y)
             self.ball.update()
             self.check_collisions()
 
@@ -271,7 +272,7 @@ class Game:
         logo_y = 60
         self.screen.blit(Assets.logo, (logo_x, logo_y))
 
-        options = ["Iniciar Jogo", "Sair"]
+        options = ["1 Jogador", "2 Jogadores", "Sair"]
         self.menu_buttons = []
         for i, option in enumerate(options):
             rect = self.draw_button(option, 280 + i * 110, i == self.menu_option, mouse_pos)
@@ -350,16 +351,21 @@ class Game:
 
             if idx == self.p1_selected_char:
                 pygame.draw.rect(self.screen, GREEN, draw_rect, 5, border_radius=15)
-            if idx == self.p2_selected_char:
+            if idx == self.p2_selected_char and self.game_mode == "2P":
                 pygame.draw.rect(self.screen, BLUE, draw_rect, 5, border_radius=15)
 
-        hint_text1 = self.font.render("P1: WASD + ESPAÇO", True, GREEN)
-        hint_text2 = self.font.render("P2: SETAS + ENTER", True, BLUE)
-        hint_text3 = self.font.render("ENTER: Começar", True, YELLOW)
-
-        self.screen.blit(hint_text1, (50, SCREEN_HEIGHT - 60))
-        self.screen.blit(hint_text3, (SCREEN_WIDTH // 2 - hint_text3.get_width() // 2, SCREEN_HEIGHT - 60))
-        self.screen.blit(hint_text2, (SCREEN_WIDTH - 50 - hint_text2.get_width(), SCREEN_HEIGHT - 60))
+        if self.game_mode == "1P":
+            hint_text1 = self.font.render("P1: WASD + ESPAÇO", True, GREEN)
+            hint_text3 = self.font.render("ENTER: Começar", True, YELLOW)
+            self.screen.blit(hint_text1, (50, SCREEN_HEIGHT - 60))
+            self.screen.blit(hint_text3, (SCREEN_WIDTH // 2 - hint_text3.get_width() // 2, SCREEN_HEIGHT - 60))
+        else:
+            hint_text1 = self.font.render("P1: WASD + ESPAÇO", True, GREEN)
+            hint_text2 = self.font.render("P2: SETAS + ENTER", True, BLUE)
+            hint_text3 = self.font.render("ENTER: Começar", True, YELLOW)
+            self.screen.blit(hint_text1, (50, SCREEN_HEIGHT - 60))
+            self.screen.blit(hint_text3, (SCREEN_WIDTH // 2 - hint_text3.get_width() // 2, SCREEN_HEIGHT - 60))
+            self.screen.blit(hint_text2, (SCREEN_WIDTH - 50 - hint_text2.get_width(), SCREEN_HEIGHT - 60))
         pygame.display.flip()
 
     def draw_field_select(self) -> None:
@@ -433,7 +439,6 @@ class Game:
             return
 
         self.screen.blit(Assets.arena_backgrounds[self.current_arena_key], (0, 0))
-        pygame.draw.rect(self.screen, (35, 70, 25), (0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40))
 
         self.goal_left.draw(self.screen)
         self.goal_right.draw(self.screen)
@@ -446,7 +451,8 @@ class Game:
         self.screen.blit(p1_label, (50, 15))
         self.screen.blit(p1_score, (50, 45))
 
-        p2_label = self.small_font.render(self.p2.name, True, BLACK)
+        p2_name_display = f"{self.p2.name} (CPU)" if self.game_mode == "1P" else self.p2.name
+        p2_label = self.small_font.render(p2_name_display, True, BLACK)
         p2_score = self.large_font.render(str(self.p2.score), True, BLACK)
         self.screen.blit(p2_label, (SCREEN_WIDTH - 50 - p2_label.get_width(), 15))
         self.screen.blit(p2_score, (SCREEN_WIDTH - 50 - p2_score.get_width(), 45))
@@ -517,6 +523,10 @@ class Game:
                         for i, rect in enumerate(self.menu_buttons):
                             if rect.collidepoint(event.pos):
                                 if i == 0:
+                                    self.game_mode = "1P"
+                                    self.state = "CHARACTER_SELECT"
+                                elif i == 1:
+                                    self.game_mode = "2P"
                                     self.state = "CHARACTER_SELECT"
                                 else:
                                     pygame.quit()
@@ -541,7 +551,7 @@ class Game:
                             if rect.collidepoint(event.pos):
                                 if event.button == 1:
                                     self.p1_selected_char = i
-                                elif event.button == 3:
+                                elif event.button == 3 and self.game_mode == "2P":
                                     self.p2_selected_char = i
                     elif self.state == "FIELD_SELECT" and event.button == 1:
                         for i, rect in enumerate(self.field_rects):
@@ -567,11 +577,15 @@ class Game:
                             self.state = "MENU"
                     elif self.state == "MENU":
                         if event.key in [pygame.K_w, pygame.K_UP]:
-                            self.menu_option = (self.menu_option - 1) % 2
+                            self.menu_option = (self.menu_option - 1) % 3
                         elif event.key in [pygame.K_s, pygame.K_DOWN]:
-                            self.menu_option = (self.menu_option + 1) % 2
+                            self.menu_option = (self.menu_option + 1) % 3
                         elif event.key == pygame.K_RETURN:
                             if self.menu_option == 0:
+                                self.game_mode = "1P"
+                                self.state = "CHARACTER_SELECT"
+                            elif self.menu_option == 1:
+                                self.game_mode = "2P"
                                 self.state = "CHARACTER_SELECT"
                             else:
                                 pygame.quit()
@@ -591,18 +605,22 @@ class Game:
                             if self.p1_selected_char % 2 == 0:
                                 self.p1_selected_char += 1
 
-                        elif event.key == pygame.K_UP:
-                            self.p2_selected_char = (self.p2_selected_char - 2) % 4
-                        elif event.key == pygame.K_DOWN:
-                            self.p2_selected_char = (self.p2_selected_char + 2) % 4
-                        elif event.key == pygame.K_LEFT:
-                            if self.p2_selected_char % 2 == 1:
-                                self.p2_selected_char -= 1
-                        elif event.key == pygame.K_RIGHT:
-                            if self.p2_selected_char % 2 == 0:
-                                self.p2_selected_char += 1
+                        if self.game_mode == "2P":
+                            if event.key == pygame.K_UP:
+                                self.p2_selected_char = (self.p2_selected_char - 2) % 4
+                            elif event.key == pygame.K_DOWN:
+                                self.p2_selected_char = (self.p2_selected_char + 2) % 4
+                            elif event.key == pygame.K_LEFT:
+                                if self.p2_selected_char % 2 == 1:
+                                    self.p2_selected_char -= 1
+                            elif event.key == pygame.K_RIGHT:
+                                if self.p2_selected_char % 2 == 0:
+                                    self.p2_selected_char += 1
 
-                        elif event.key == pygame.K_RETURN:
+                        if self.game_mode == "1P":
+                            self.p2_selected_char = (self.p1_selected_char + 1) % 4
+
+                        if event.key == pygame.K_RETURN:
                             self.state = "FIELD_SELECT"
                             self.field_select_option = 0
                         elif event.key == pygame.K_ESCAPE:

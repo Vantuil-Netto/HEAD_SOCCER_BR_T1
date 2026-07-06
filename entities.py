@@ -9,7 +9,7 @@ from assets import Assets
 
 
 class Player:
-    def __init__(self, x: int, y: int, char_data: dict, controls: dict, side: int, arena: dict, arena_key: str = "Grama") -> None:
+    def __init__(self, x: int, y: int, char_data: dict, controls: dict, side: int, arena: dict, arena_key: str = "Grama", is_ai: bool = False) -> None:
         self.initial_x: int = x
         self.initial_y: int = y
         self.rect: pygame.Rect = pygame.Rect(x, y, 145, 175)
@@ -20,6 +20,7 @@ class Player:
         self.side: int = side
         self.arena: dict = arena
         self.arena_key: str = arena_key
+        self.is_ai: bool = is_ai
 
         self.head_img, self.head_img_r = Assets.heads[self.key]
         self.current_img = self.head_img if side == 0 else self.head_img_r
@@ -50,7 +51,7 @@ class Player:
         self.shoe_offset_y = 0
         self.kicking = False
 
-    def update(self) -> None:
+    def update(self, ball_x: float = None, ball_y: float = None) -> None:
         now = pygame.time.get_ticks()
 
         if self.kicking:
@@ -74,21 +75,24 @@ class Player:
                 self.shoe_offset_x = 0
                 self.shoe_offset_y = 0
 
-        keys = pygame.key.get_pressed()
-        if keys[self.controls['left']]:
-            self.vel_x = -self.speed
-        elif keys[self.controls['right']]:
-            self.vel_x = self.speed
+        if self.is_ai and ball_x is not None:
+            self.update_ai(ball_x, ball_y)
         else:
-            self.vel_x = 0
+            keys = pygame.key.get_pressed()
+            if keys[self.controls['left']]:
+                self.vel_x = -self.speed
+            elif keys[self.controls['right']]:
+                self.vel_x = self.speed
+            else:
+                self.vel_x = 0
 
-        if keys[self.controls['jump']] and not self.is_jumping:
-            self.vel_y = self.jump_power
-            self.is_jumping = True
+            if keys[self.controls['jump']] and not self.is_jumping:
+                self.vel_y = self.jump_power
+                self.is_jumping = True
 
-        if keys[self.controls['special']] and not self.kicking:
-            self.kicking = True
-            self.kick_animation_timer = pygame.time.get_ticks()
+            if keys[self.controls['special']] and not self.kicking:
+                self.kicking = True
+                self.kick_animation_timer = pygame.time.get_ticks()
 
         self.vel_y += self.arena["gravity"]
         self.rect.x += self.vel_x
@@ -107,6 +111,34 @@ class Player:
         shoe_x = self.rect.centerx + self.shoe_offset_x + (90 if self.side == 0 else -90)
         shoe_y = self.rect.centery + self.shoe_offset_y + 55
         self.shoe_hitbox.center = (int(shoe_x), int(shoe_y))
+
+    def update_ai(self, ball_x: float, ball_y: float) -> None:
+        dx = ball_x - self.rect.centerx
+        dy = ball_y - self.rect.centery
+        dist = math.hypot(dx, dy)
+
+        is_ball_on_my_side = (self.side == 1 and ball_x > SCREEN_WIDTH // 2) or (self.side == 0 and ball_x < SCREEN_WIDTH // 2)
+
+        if dist < 500 or is_ball_on_my_side:
+            if abs(dx) > 60:
+                self.vel_x = self.speed if dx > 0 else -self.speed
+            else:
+                self.vel_x = 0
+
+            if dy < -60 and not self.is_jumping and abs(dx) < 200:
+                self.vel_y = self.jump_power
+                self.is_jumping = True
+
+            if abs(dx) < 130 and abs(dy) < 80 and not self.kicking:
+                self.kicking = True
+                self.kick_animation_timer = pygame.time.get_ticks()
+        else:
+            defend_x = SCREEN_WIDTH * 0.75 if self.side == 1 else SCREEN_WIDTH * 0.25
+            dx_defend = defend_x - self.rect.centerx
+            if abs(dx_defend) > 20:
+                self.vel_x = self.speed if dx_defend > 0 else -self.speed
+            else:
+                self.vel_x = 0
 
     def draw(self, screen: pygame.Surface) -> None:
         shoe_img = Assets.arena_shoes[self.arena_key][self.side]
